@@ -44,6 +44,44 @@ npm install
 npm start
 ```
 
+## HTTP API
+
+The chatbot also supports HTTP API mode. To start the HTTP API server, run:
+
+```bash
+npm run api
+```
+
+The server will start on port 3000.
+
+#### API Endpoints
+
+##### POST /chat
+
+Send a chat message to the bot.
+
+**Request:**
+```json
+{
+  "text": "your message here"
+}
+```
+
+**Response:**
+```json
+{
+  "response": "bot's response",
+  "error": null  // or error message if any
+}
+```
+
+**Example:**
+```bash
+curl -X POST http://localhost:3000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"text": "What is the current gas price on Base?"}'
+```
+
 ## License
 
 Apache-2.0
