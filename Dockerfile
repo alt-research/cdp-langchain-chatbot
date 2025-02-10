@@ -14,5 +14,8 @@ COPY . .
 # Set environment variables
 ENV NODE_OPTIONS='--no-warnings'
 
-# Start the application
-CMD ["npm", "start"]
+# Expose the HTTP port
+EXPOSE 3000
+
+# Start the application in API mode
+CMD ["npm", "run", "api"]
