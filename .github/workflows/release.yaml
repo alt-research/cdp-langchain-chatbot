@@ -1,0 +1,46 @@
+name: Release
+on:
+  push:
+    tags: ["*"]
+
+env:
+  ECR_REPO: 305587085711.dkr.ecr.us-west-2.amazonaws.com/chatbot-api
+
+jobs:
+  build_image:
+    name: Build docker image
+    runs-on: ["ubuntu-latest"]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Login to ECR
+        uses: docker/login-action@v3
+        with:
+          registry: 305587085711.dkr.ecr.us-west-2.amazonaws.com
+          username: ${{ secrets.ECR_ACCESS_KEY_ID }}
+          password: ${{ secrets.ECR_ACCESS_KEY }}
+          
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.ECR_REPO }}
+          tags: |
+            type=ref,event=tag
+            type=sha,prefix=chatbot-api-,format=short
+            type=raw,value=chatbot-api-latest
+            
+      - name: Create env file
+        run: |
+          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
+          echo "CDP_API_KEY_NAME=${{ secrets.CDP_API_KEY_NAME }}" >> .env
+          echo "CDP_API_KEY_PRIVATE_KEY=${{ secrets.CDP_API_KEY_PRIVATE_KEY }}" >> .env
+          echo "NETWORK_ID=base-mainnet" >> .env
+          
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
