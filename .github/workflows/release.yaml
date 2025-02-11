@@ -1,46 +1,62 @@
-name: Release
+name: Build and Push Node.js Docker Image (GCP)
+
 on:
   push:
     tags: ["*"]
 
 env:
-  ECR_REPO: 305587085711.dkr.ecr.us-west-2.amazonaws.com/chatbot-api
+  GAR_REPO: us-west1-docker.pkg.dev/shared-resources-alt/agentkit-ts/agentkit-ts
 
 jobs:
-  build_image:
-    name: Build docker image
-    runs-on: ["ubuntu-latest"]
+  build_and_push:
+    name: Build and Push Docker Image to GAR
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Login to ECR
-        uses: docker/login-action@v3
+      # Step 1: Checkout Repository
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Step 2: Extract App Name & Tag from Git Tag
+      - name: Extract App Name and Tag
+        run: |
+          tag=${GITHUB_REF#refs/*/}
+          app=$(echo $tag | rev | cut -d- -f2- | rev)
+          echo "TAG=$tag" >> $GITHUB_ENV
+          echo "APP=$app" >> $GITHUB_ENV
+
+      # Step 3: Authenticate to Google Cloud
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v2'
         with:
-          registry: 305587085711.dkr.ecr.us-west-2.amazonaws.com
-          username: ${{ secrets.ECR_ACCESS_KEY_ID }}
-          password: ${{ secrets.ECR_ACCESS_KEY }}
-          
-      - name: Extract metadata (tags, labels) for Docker
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+
+      # Step 4: Set up Cloud SDK
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v2'
+        with:
+          project_id: shared-resources-alt
+
+      # Step 5: Configure Docker for GAR
+      - name: Configure Docker for GAR
+        run: gcloud auth configure-docker us-west1-docker.pkg.dev
+
+      # Step 6: Extract Docker Metadata
+      - name: Extract Metadata (Tags, Labels)
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: |
-            ${{ env.ECR_REPO }}
+          images: ${{ env.GAR_REPO }}
           tags: |
-            type=ref,event=tag
-            type=sha,prefix=chatbot-api-,format=short
-            type=raw,value=chatbot-api-latest
-            
-      - name: Create env file
-        run: |
-          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
-          echo "CDP_API_KEY_NAME=${{ secrets.CDP_API_KEY_NAME }}" >> .env
-          echo "CDP_API_KEY_PRIVATE_KEY=${{ secrets.CDP_API_KEY_PRIVATE_KEY }}" >> .env
-          echo "NETWORK_ID=base-mainnet" >> .env
-          
-      - name: Build and push
+            type=raw,value=${{ env.TAG }}
+            type=raw,value=latest
+
+      # Step 7: Build and Push Docker Image to GAR
+      - name: Build and Push Docker Image
         uses: docker/build-push-action@v5
         with:
           context: .
+          file: ./Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: |
+            ${{ env.GAR_REPO }}:${{ env.TAG }}
+            ${{ env.GAR_REPO }}:latest
